@@ -75,6 +75,7 @@ void write_to_file(const char *path, const char *value);
 void gpio_export();
 void gpio_set_direction(const char *direction);
 void gpio_set_value(const char *value);
+uint8_t led_state;
 
 static const char test_device_name[] = "Very Long Test Device Name For Testing "
 				"ATT Protocol Operations On GATT Server";
@@ -463,7 +464,7 @@ static void led_state_write_cb(struct gatt_db_attribute *attrib, unsigned int id
                                uint16_t offset, const uint8_t *value, size_t len,
                                uint8_t opcode, struct bt_att *att, void *user_data)
 {
-    uint8_t led_state = value[0];
+    led_state = value[0];
     
     if (len != 1) {
         gatt_db_attribute_write_result(attrib, id, BT_ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LEN);
