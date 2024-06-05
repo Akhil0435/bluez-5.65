@@ -35,12 +35,19 @@
 #include "src/shared/gatt-db.h"
 #include "src/shared/gatt-server.h"
 
+#include<unistd.h>
+#include<fcntl.h>
+
 #define UUID_GAP			0x1800
 #define UUID_GATT			0x1801
 #define UUID_HEART_RATE			0x180d
 #define UUID_HEART_RATE_MSRMT		0x2a37
 #define UUID_HEART_RATE_BODY		0x2a38
 #define UUID_HEART_RATE_CTRL		0x2a39
+
+#define UUID_LED_SERVICE                0x00FF
+#define UUID_LED_STATE_CHAR             0xFF01
+#define GPIO_PIN "84" // GPIO3_IO20 corresponds to GPIO number 84
 
 #define ATT_CID 4
 
@@ -62,6 +69,12 @@
 #define COLOR_MAGENTA	"\x1B[0;95m"
 #define COLOR_BOLDGRAY	"\x1B[1;30m"
 #define COLOR_BOLDWHITE	"\x1B[1;37m"
+
+/**********Function declarations for GPIO***************/
+void write_to_file(const char *path, const char *value);
+void gpio_export();
+void gpio_set_direction(const char *direction);
+void gpio_set_value(const char *value);
 
 static const char test_device_name[] = "Very Long Test Device Name For Testing "
 				"ATT Protocol Operations On GATT Server";
@@ -398,6 +411,76 @@ static void confirm_write(struct gatt_db_attribute *attr, int err,
 	exit(1);
 }
 
+/***************************GPIO oerations**************************/
+void write_to_file(const char *path, const char *value) {
+    int fd = open(path, O_WRONLY);
+    if (fd == -1) {
+        perror("Unable to open file");
+        exit(1);
+    }
+    if (write(fd, value, strlen(value)) == -1) {
+        perror("Unable to write to file");
+        close(fd);
+        exit(1);
+    }
+    close(fd);
+}
+
+void gpio_export() {
+    write_to_file("/sys/class/gpio/export", GPIO_PIN);
+}
+
+void gpio_set_direction(const char *direction) {
+    char path[100];
+    snprintf(path, sizeof(path), "/sys/class/gpio/gpio%s/direction", GPIO_PIN);
+    write_to_file(path, direction);
+}
+
+void gpio_set_value(const char *value) {
+    char path[100];
+    snprintf(path, sizeof(path), "/sys/class/gpio/gpio%s/value", GPIO_PIN);
+    write_to_file(path, value);
+}
+
+/*********Read callback for LED state characteristic*********/
+
+static void led_state_read_cb(struct gatt_db_attribute *attrib, unsigned int id,
+                              uint16_t offset, uint8_t opcode, struct bt_att *att,
+                              void *user_data)
+{
+    uint8_t value[1];
+    ssize_t len;
+
+    value[0] = led_state;
+    len = sizeof(value);
+
+    gatt_db_attribute_read_result(attrib, id, 0, value, len);
+}
+
+/********Write callback for LED state characteristic**********/
+
+static void led_state_write_cb(struct gatt_db_attribute *attrib, unsigned int id,
+                               uint16_t offset, const uint8_t *value, size_t len,
+                               uint8_t opcode, struct bt_att *att, void *user_data)
+{
+    uint8_t led_state = value[0];
+    
+    if (len != 1) {
+        gatt_db_attribute_write_result(attrib, id, BT_ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LEN);
+        return;
+    }	
+
+    if (led_state == 0) {
+        gpio_set_value("0"); // Turn LED off
+        printf("LED turned off\n");
+    } else {
+        gpio_set_value("1"); // Turn LED on
+        printf("LED turned on\n");
+    }
+
+    gatt_db_attribute_write_result(attrib, id, 0);
+}
+
 static void populate_gap_service(struct server *server)
 {
 	bt_uuid_t uuid;
@@ -526,12 +609,57 @@ static void populate_hr_service(struct server *server)
 	if (server->hr_visible)
 		gatt_db_service_set_active(service, true);
 }
+/***********Led Service and Characteristics***********/
+
+static void populate_led_service(struct server *server)
+{
+    bt_uuid_t uuid;
+    int val;
+    struct gatt_db_attribute *service, *led_state_char;
+    printf("Led service and characteristics function\n");
+
+    // Add the LED service
+    val = bt_uuid16_create(&uuid, UUID_LED_SERVICE);
+    if(val == 0)
+            printf("bt_uuid_t structure created successfully\n");
+    else
+            printf("bt_uuid_t structure not created\n");
+
+    service = gatt_db_add_service(server->db, &uuid, true, 4);
+    if(service != NULL)
+            printf("Service created successfully\n");
+    else
+            printf("Service not created for led\n");
+
+    // Add the LED state characteristic
+    bt_uuid16_create(&uuid, UUID_LED_STATE_CHAR);
+    led_state_char = gatt_db_service_add_characteristic(service, &uuid,
+            BT_ATT_PERM_READ | BT_ATT_PERM_WRITE,
+            BT_GATT_CHRC_PROP_READ | BT_GATT_CHRC_PROP_WRITE,
+            led_state_read_cb, led_state_write_cb, server);
+    if(led_state_char != NULL)
+            printf("characteristics created successfully\n");
+    else
+            printf("charcteristics not created for led\n");
+
+    gatt_db_service_add_descriptor(service, &uuid,
+                                        BT_ATT_PERM_READ | BT_ATT_PERM_WRITE,
+                                        led_state_read_cb,
+                                        led_state_write_cb, server);
+    if(gatt_db_service_set_active(service, true))
+            printf("gatt_db_service_set_active\n");
+    else
+            printf("gatt_db_service_set_inactive\n");
+
+}
 
 static void populate_db(struct server *server)
 {
 	populate_gap_service(server);
 	populate_gatt_service(server);
 	populate_hr_service(server);
+	populate_led_service(server);  // this line to include the LED service
+
 }
 
 static struct server *server_create(int fd, uint16_t mtu, bool hr_visible)
@@ -1231,7 +1359,11 @@ int main(int argc, char *argv[])
 	}
 
 	mainloop_init();
-
+        /***************Initialize GPIO*******************/
+         gpio_export();
+         usleep(100000); // Sleep for 100ms to allow the GPIO to be exported
+         gpio_set_direction("out");
+	
 	server = server_create(fd, mtu, hr_visible);
 	if (!server) {
 		close(fd);
