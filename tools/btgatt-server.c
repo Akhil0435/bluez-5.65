@@ -47,7 +47,7 @@
 
 #define UUID_LED_SERVICE                0x00FF
 #define UUID_LED_STATE_CHAR             0xFF01
-//#define GPIO_PIN "84" // GPIO3_IO20 corresponds to GPIO number 84
+#define GPIO_PIN "84" // GPIO3_IO20 corresponds to GPIO number 84
 
 #define ATT_CID 4
 
@@ -71,10 +71,10 @@
 #define COLOR_BOLDWHITE	"\x1B[1;37m"
 
 /**********Function declarations for GPIO***************/
-/*void write_to_file(const char *path, const char *value);
+void write_to_file(const char *path, const char *value);
 void gpio_export();
 void gpio_set_direction(const char *direction);
-void gpio_set_value(const char *value);*/
+void gpio_set_value(const char *value);
 uint8_t led_state;
 
 static const char test_device_name[] = "Very Long Test Device Name For Testing "
@@ -413,7 +413,7 @@ static void confirm_write(struct gatt_db_attribute *attr, int err,
 }
 
 /***************************GPIO oerations**************************/
-/*void write_to_file(const char *path, const char *value) {
+void write_to_file(const char *path, const char *value) {
     int fd = open(path, O_WRONLY);
     if (fd == -1) {
         perror("Unable to open file");
@@ -441,7 +441,7 @@ void gpio_set_value(const char *value) {
     char path[100];
     snprintf(path, sizeof(path), "/sys/class/gpio/gpio%s/value", GPIO_PIN);
     write_to_file(path, value);
-}*/
+}
 
 /*********Read callback for LED state characteristic*********/
 
@@ -471,13 +471,13 @@ static void led_state_write_cb(struct gatt_db_attribute *attrib, unsigned int id
         return;
     }	
 
-   /* if (led_state == 0) {
+    if (led_state == 0) {
         gpio_set_value("0"); // Turn LED off
         printf("LED turned off\n");
     } else {
         gpio_set_value("1"); // Turn LED on
         printf("LED turned on\n");
-    }*/
+    }
 
     gatt_db_attribute_write_result(attrib, id, 0);
 }
@@ -1361,9 +1361,9 @@ int main(int argc, char *argv[])
 
 	mainloop_init();
         /***************Initialize GPIO*******************/
- /*        gpio_export();
+         gpio_export();
          usleep(100000); // Sleep for 100ms to allow the GPIO to be exported
-         gpio_set_direction("out");*/
+         gpio_set_direction("out");
 	
 	server = server_create(fd, mtu, hr_visible);
 	if (!server) {
