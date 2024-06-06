@@ -443,7 +443,7 @@ void gpio_set_value(const char *value) {
     write_to_file(path, value);
 }
 
-/*********Read callback for LED state characteristic*********/
+/*********Callback function for reading LED state characteristic*********/
 
 static void led_state_read_cb(struct gatt_db_attribute *attrib, unsigned int id,
                               uint16_t offset, uint8_t opcode, struct bt_att *att,
@@ -455,17 +455,17 @@ static void led_state_read_cb(struct gatt_db_attribute *attrib, unsigned int id,
     value[0] = led_state;
     len = sizeof(value);
 
-    gatt_db_attribute_read_result(attrib, id, 0, value, len);
+    gatt_db_attribute_read_result(attrib, id, 0, value, len); //Sends the result back to client
 }
 
-/********Write callback for LED state characteristic**********/
+/********Callback for writing the LED state characteristic**********/
 
 static void led_state_write_cb(struct gatt_db_attribute *attrib, unsigned int id,
                                uint16_t offset, const uint8_t *value, size_t len,
                                uint8_t opcode, struct bt_att *att, void *user_data)
 {
     led_state = value[0];
-    
+    //check if length of written value is 1 byte and sends an error and exit the function if length not equals to 1 byte
     if (len != 1) {
         gatt_db_attribute_write_result(attrib, id, BT_ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LEN);
         return;
@@ -479,7 +479,7 @@ static void led_state_write_cb(struct gatt_db_attribute *attrib, unsigned int id
         printf("LED turned on\n");
     }
 
-    gatt_db_attribute_write_result(attrib, id, 0);
+    gatt_db_attribute_write_result(attrib, id, 0); //Sends result back to client
 }
 
 static void populate_gap_service(struct server *server)
@@ -610,47 +610,57 @@ static void populate_hr_service(struct server *server)
 	if (server->hr_visible)
 		gatt_db_service_set_active(service, true);
 }
-/***********Led Service and Characteristics***********/
+/***This function initializes the Led Service and Characteristics in the GATT database***/
 
 static void populate_led_service(struct server *server)
 {
     bt_uuid_t uuid;
     int val;
     struct gatt_db_attribute *service, *led_state_char;
-    printf("Led service and characteristics function\n");
+    printf("Led service and characteristics initialization function\n");
 
     // Add the LED service
     val = bt_uuid16_create(&uuid, UUID_LED_SERVICE);
     if(val == 0)
-            printf("bt_uuid_t structure created successfully\n");
+            printf("16-bit UUID for the led service created successfully\n");
     else
-            printf("bt_uuid_t structure not created\n");
+            printf("Failed to create 16-bit UUID for led service\n");
 
+    //Add led service to the GATT database
     service = gatt_db_add_service(server->db, &uuid, true, 4);
     if(service != NULL)
-            printf("Service created successfully\n");
+            printf("led service is successfully added in GATT database\n");
     else
-            printf("Service not created for led\n");
+            printf("Failed to add led service in the GATT database\n");
 
     // Add the LED state characteristic
-    bt_uuid16_create(&uuid, UUID_LED_STATE_CHAR);
+    val = bt_uuid16_create(&uuid, UUID_LED_STATE_CHAR);
+    if(val == 0)
+            printf("16-bit UUID for the led characteristic created successfully\n");
+    else
+            printf("Failed to create 16-bit UUID for led characteristic\n");
+
+    //Adds led characteristics to the service in GATT database with read and write properties and also set the read and write callback functions	
     led_state_char = gatt_db_service_add_characteristic(service, &uuid,
             BT_ATT_PERM_READ | BT_ATT_PERM_WRITE,
             BT_GATT_CHRC_PROP_READ | BT_GATT_CHRC_PROP_WRITE,
             led_state_read_cb, led_state_write_cb, server);
     if(led_state_char != NULL)
-            printf("characteristics created successfully\n");
+            printf("Led characteristics to the service in GATT database, added successfully\n");
     else
-            printf("charcteristics not created for led\n");
+            printf("Failed to add led characteristics to the service\n");
+    //Adds descriptor to the characteristic in GATT database with read and write properties and also set the read and write callback functions	
 
     gatt_db_service_add_descriptor(service, &uuid,
                                         BT_ATT_PERM_READ | BT_ATT_PERM_WRITE,
                                         led_state_read_cb,
                                         led_state_write_cb, server);
+
+    //Activate service for led
     if(gatt_db_service_set_active(service, true))
-            printf("gatt_db_service_set_active\n");
+            printf("GATT service for led is activated\n");
     else
-            printf("gatt_db_service_set_inactive\n");
+            printf("GATT service for led is not activated\n");
 
 }
 
