@@ -441,8 +441,8 @@ void gpio_set_value(const char *value) {
     char path[100];
     snprintf(path, sizeof(path), "/sys/class/gpio/gpio%s/value", GPIO_PIN);
     write_to_file(path, value);
-}
-*/
+}*/
+
 /*********Read callback for LED state characteristic*********/
 
 static void led_state_read_cb(struct gatt_db_attribute *attrib, unsigned int id,
@@ -471,13 +471,13 @@ static void led_state_write_cb(struct gatt_db_attribute *attrib, unsigned int id
         return;
     }	
 
-    if (led_state == 0) {
-     //   gpio_set_value("0"); // Turn LED off
+   /* if (led_state == 0) {
+        gpio_set_value("0"); // Turn LED off
         printf("LED turned off\n");
     } else {
-       // gpio_set_value("1"); // Turn LED on
+        gpio_set_value("1"); // Turn LED on
         printf("LED turned on\n");
-    }
+    }*/
 
     gatt_db_attribute_write_result(attrib, id, 0);
 }
@@ -1361,7 +1361,7 @@ int main(int argc, char *argv[])
 
 	mainloop_init();
         /***************Initialize GPIO*******************/
-         /*gpio_export();
+ /*        gpio_export();
          usleep(100000); // Sleep for 100ms to allow the GPIO to be exported
          gpio_set_direction("out");*/
 	
